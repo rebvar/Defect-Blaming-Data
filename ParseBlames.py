@@ -15,11 +15,9 @@ Name = 'KIM-Minify2-CLF-DB'
 
 logDates = {}
 dbh = DBHelper()
-logAuthors={}
-authorMails = set()
 
 logs,logcolnames = dbh.GET_ALL(table='LOGS')
-filerows,fidCols =  dbh.GET_ALL(table='FILES',fields=['rowid','file'])
+filerows,fidCols =  dbh.GET_ALL(table='FILES')
 fileIDS = {}
 for row in filerows:
     fileIDS[row[1]] = row[0]
@@ -27,7 +25,7 @@ for row in filerows:
 filerows = None
 logsd = {}
 
-fidcmpBlamed = {}
+fidCBL = {}
 
 fidcmpBlamer = {}
 
@@ -37,9 +35,9 @@ for log in logs:
     key = log[logcolnames.index('locid')]
     logsd[key]=log
     logDates[key]=log[logcolnames.index('timestamp')]    
-    email = log[logcolnames.index('author')]
-    logAuthors[key] = email
-    authorMails.add(email)
+    
+    
+    
 logs = None
 
 for key in logsd.keys():
@@ -49,7 +47,7 @@ for key in logsd.keys():
 bugDates = {}
         
 keys = ['bug','reportTimestamp','status','product','component']
-vbugs,vbugscolnames = dbh.GET_ALL(table='VALIDBUGS',fields=keys,Where="  where lower(status) like '%fixed%' and (lower(product)='core')")
+vbugs,vbugscolnames = dbh.GET_ALL(table='VALIDBUGS')
 
 for line in vbugs:
             
@@ -67,18 +65,14 @@ ChgCompBlamed = {}
 ChgCompBlamer = {}
 
 for cmpName in comps:
-    allfiles = set()        
-    
-    
+    allfiles = set()                
     BlameFol = 'Blames'+Name+'/'
             
     blamedMultiParents=[]
     blamedHasMergeKeyword=[]
     
-    blamedAuthors = {}
-    blamerAuthors = {}
     
-	def ExtractBlames(lines,ruBlamer,ruBlamed,Blamer,Blamed,ruFileBlamer, ruFileBlamed, FileBlamer, FileBlamed):
+	def ExtractBlames(lines,ruBlamer,ruBlamed,Blamer,Blamed,ruFlBlmr, ruFileBlamed, FileBlamer, FileBlamed):
         for i,line in enumerate(lines):
         
             line = line.split(Helpers.bcSep)
@@ -97,64 +91,40 @@ for cmpName in comps:
 		
             parentNode = line[3].split('-')
             subjNode = line[4].split('-')
-            blamedRev = parentNode[0].split(':')[1]
+            blmdRv = parentNode[0].split(':')[1]
             BlameLines = parentNode[1]+'-'+parentNode[2]+','+subjNode[1]+'-'+subjNode[2]
-            blamedAuth = logAuthors[int(blamedRev)]
             
-			
-            if not blamerAuth in blamerAuthors.keys():
-                blamerAuthors[blamerAuth] = set()
-            blamerAuthors[blamerAuth].add(cmb+";"+blamedRev)
-
-            if not blamedAuth in blamedAuthors.keys():
-                blamedAuthors[blamedAuth] = set()
-            blamedAuthors[blamedAuth].add(cmb+";"+blamedRev)
-
-            parentsForBlamedRev = logsd[int(blamedRev)][logcolnames.index('parents')]
-            if parentsForBlamedRev.count(',')>0:
-                blamedMultiParents.append(blamedRev)
-            
-        
-            msg = logsd[int(blamedRev)][logcolnames.index('m')]
-            if msg.lower().find('merge')>=0:
-                blamedHasMergeKeyword.append(blamedRev)
-            
-        
             #RUBlamer
             if not cmb in ruBlamer.keys():
                 ruBlamer[cmb] = {}
 
-            if blamedRev not in ruBlamer[cmb].keys():
-                ruBlamer[cmb][blamedRev] = []
-            ruBlamer[cmb][blamedRev].append(BlameLines)
+            if blmdRv not in ruBlamer[cmb].keys():
+                ruBlamer[cmb][blmdRv] = []
+            ruBlamer[cmb][blmdRv].append(BlameLines)
 
-            #RUFileBlamer
-            if not fid in ruFileBlamer.keys():
-                ruFileBlamer[fid] = {}
+            #ruFlBlmr
+            if not fid in ruFlBlmr.keys():
+                ruFlBlmr[fid] = {}
 
+            if not commitId in ruFlBlmr[fid].keys():
+                ruFlBlmr[fid][commitId] = {}
 
-            if not commitId in ruFileBlamer[fid].keys():
-                ruFileBlamer[fid][commitId] = {}
+            if not bugId in ruFlBlmr[fid][commitId].keys():
+                ruFlBlmr[fid][commitId][bugId] = {}
 
-            if not bugId in ruFileBlamer[fid][commitId].keys():
-                ruFileBlamer[fid][commitId][bugId] = {}
-
-            if blamedRev not in ruFileBlamer[fid][commitId][bugId].keys():
-                ruFileBlamer[fid][commitId][bugId][blamedRev] = []
-            ruFileBlamer[fid][commitId][bugId][blamedRev].append(BlameLines)
+            if blmdRv not in ruFlBlmr[fid][commitId][bugId].keys():
+                ruFlBlmr[fid][commitId][bugId][blmdRv] = []
+            ruFlBlmr[fid][commitId][bugId][blmdRv].append(BlameLines)
 
             #RUFileBlamed
             if not fid in ruFileBlamed.keys():
                 ruFileBlamed[fid] = {}
 
-            if not blamedRev in ruFileBlamed[fid].keys():
-                ruFileBlamed[fid][blamedRev] = set()
+            if not blmdRv in ruFileBlamed[fid].keys():
+                ruFileBlamed[fid][blmdRv] = set()
 
-            if not cmb in ruFileBlamed[fid][blamedRev]:
-                ruFileBlamed[fid][blamedRev].add(cmb)
-
-
-
+            if not cmb in ruFileBlamed[fid][blmdRv]:
+                ruFileBlamed[fid][blmdRv].add(cmb)
 
 
     rBlamed = {}
@@ -186,14 +156,7 @@ for cmpName in comps:
             f.close()
             ExtractBlames(lines,uBlamer,uBlamed,Blamer,Blamed,uFileBlamer, uFileBlamed, FileBlamer, FileBlamed)
 
-    
-    uniqC = set ()
-    uniqB = set()
-    for idid in Blamer.keys():
-        idid = idid.split('--')
-        uniqC.add(idid[0])
-        uniqB.add(idid[1])
-    
+        
     allchanges = set()
 
     for cmb in Blamer.keys():
@@ -204,7 +167,6 @@ for cmpName in comps:
             if not chg in allchanges:
                 allchanges.add(chg)
 
-    
     G=nx.DiGraph()
     for nd in allchanges:
         G.add_node(nd)
@@ -274,8 +236,6 @@ for cmpName in comps:
             if not b in BlamedForBug.keys():
                 BlamedForBug[b] = set()
             BlamedForBug[b].add(cmb.split('--')[0])
-
-
     timespans = []
     timespansNoz = []
     ids = []
@@ -311,9 +271,6 @@ for cmpName in comps:
     umad = mad+np.median(timespansNoz)
     lmad = np.median(timespansNoz)-mad
 
-    if not 'FileJustBlamed' in ChgCompBlamed.keys():
-        ChgCompBlamed['FileJustBlamed'] = {}
-
     allChangesets = set()
 
     fids = set()
@@ -326,24 +283,6 @@ for cmpName in comps:
     for fid in fids:
         allChgSet = set()
 		
-        if not fid in fidcmpBlamer.keys():
-            fidcmpBlamer[fid] = {}
-        
-
-        if not fid in fidcmpBlamed.keys():
-            fidcmpBlamed[fid] = {}
-
-        if not fid in fidcmp.keys():
-            fidcmp[fid] = {}
-
-
-        for chg in FileBlamed[fid].keys():
-            allChgSet.add(chg)
-
-        for chg in FileBlamer[fid].keys():
-            allChgSet.add(chg)
-
-        
         i=0 
         for rev in allChgSet:
             blamedCount = 0
@@ -351,10 +290,10 @@ for cmpName in comps:
 
             if rev in FileBlamed[fid].keys():
                 blamedCount = len(FileBlamed[fid][rev])
-                if cmpName not in fidcmpBlamed[fid].keys():
-                    fidcmpBlamed[fid][cmpName]=1
+                if cmpName not in fidCBL[fid].keys():
+                    fidCBL[fid][cmpName]=1
                 else:
-                    fidcmpBlamed[fid][cmpName]+=1
+                    fidCBL[fid][cmpName]+=1
 
                 if cmpName not in fidcmp[fid].keys():
                     fidcmp[fid][cmpName]=1
@@ -388,10 +327,7 @@ for cmpName in comps:
                 print (i)
             i+=1
 
-        
-    json.dump(sorted(list(allChangesets)),open('Datasets/'+BlameFol[:-1]+'--File---JustBlamedAndBlamerChangeSets.txt','w'))
-
-
+			
 o = open(Name+'--File--ChgCompBlamedJustBlamed.txt','w')
 for key in ChgCompBlamed['FileJustBlamed'].keys():
     o.write('%s;%s;%d\n'%(key,ChgCompBlamed['FileJustBlamed'][key],len(ChgCompBlamed['FileJustBlamed'][key])))
@@ -400,9 +336,3 @@ o.close()
 
 if not os.path.exists('htfidcmp.json'):
     json.dump(fidcmp,open('htfidcmp.json','w'))
-
-if not os.path.exists('htfidcmpBlamed.json'):
-    json.dump(fidcmpBlamed,open('htfidcmpBlamed.json','w'))
-
-if not os.path.exists('htfidcmpBlamer.json'):
-    json.dump(fidcmpBlamer,open('htfidcmpBlamer.json','w'))
